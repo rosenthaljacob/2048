@@ -24,6 +24,12 @@ body {
     padding: 1rem 1.5rem;
 }
 
+.info-container {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
 .game-container {
     z-index: 2;
     position: relative;
