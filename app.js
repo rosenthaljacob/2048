@@ -215,11 +215,6 @@ function createTable() {
   return columnsWithRows;
 }
 
-const fps = {
-  startTime: 0,
-  frameNumber: 0,
-};
-
 function paintFrame(game, columnsAndRows) {
   columnsAndRows.forEach(({ column, rows }, x) => {
     rows.forEach((row, y) => {
@@ -230,16 +225,6 @@ function paintFrame(game, columnsAndRows) {
 
   paintCurrentBlock(game, columnsAndRows);
   paintScore(game);
-
-  // FPS
-  const d = new Date().getTime();
-  if (d > fps.startTime + 1000) {
-    document.getElementById("fps").innerText = fps.frameNumber;
-
-    fps.frameNumber = 0;
-    fps.startTime = d;
-  }
-  fps.frameNumber++;
 }
 
 function paintCell(cell, value) {

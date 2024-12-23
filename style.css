@@ -4,7 +4,7 @@ body {
     font-family: "Nunito", 'Roboto', sans-serif;
     background-color: #09090b;
     color: white;
-    overscroll-behavior: none;
+    /* overscroll-behavior: none; */
 }
 
 * {
