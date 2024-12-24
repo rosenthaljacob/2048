@@ -28,6 +28,7 @@ body {
     display: flex;
     justify-content: space-between;
     width: 100%;
+    align-items: center;
 }
 
 .game-container {
@@ -160,4 +161,47 @@ div.row:first-child:before {
 
 .block[data-value="262144"] {
     background-color: #000;
+}
+
+.dialog {
+    z-index: 3;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(0.25rem);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    gap: 1rem;
+}
+
+.dialog p {
+    margin: 0;
+    margin-bottom: 1.5rem;
+}
+
+.dialog button {
+    padding: 1rem 1.5rem;
+    background-color: #db2777;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.pause-button {
+    width: 2rem;
+    height: 2rem;
+    background-color: #db2777;
+    padding: 0;
+    border: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
 }

@@ -270,6 +270,15 @@ class Game {
       numberOfTouchingBlocks,
     };
   }
+
+  getScore() {
+    return this.board.flat().reduce((acc, block) => {
+      if (block === null) {
+        return acc;
+      }
+      return acc + block;
+    }, 0);
+  }
 }
 
 // UI paint
@@ -316,6 +325,15 @@ function paintFrame(game, columnsAndRows) {
 
   paintCurrentBlock(game, columnsAndRows);
   paintScore(game);
+
+  if (game.gameOver) {
+    dialog({
+      title: "Game Over",
+      description: `Score: ${game.getScore()}`,
+      buttonText: "Restart",
+      buttonAction: startGame,
+    });
+  }
 }
 
 function paintCell(cell, value) {
@@ -354,14 +372,7 @@ function paintCell(cell, value) {
 function paintScore(game) {
   const scoreElement = document.getElementById("score");
 
-  const score = game.board.flat().reduce((acc, block) => {
-    if (block === null) {
-      return acc;
-    }
-    return acc + block;
-  }, 0);
-
-  scoreElement.innerText = score;
+  scoreElement.innerText = game.getScore();
 }
 
 function paintCurrentBlock(game, columnsAndRows) {
@@ -401,12 +412,31 @@ function paintCurrentBlock(game, columnsAndRows) {
   cell.appendChild(blockElement);
 }
 
+function dialog({ title, description, buttonText, buttonAction }) {
+  const dialog = document.createElement("div");
+  dialog.classList.add("dialog");
+  dialog.innerHTML = `
+        <h1>${title}</h1>
+        ${description ? `<p>${description}</p>` : ""}
+        <button>${buttonText}</button>
+    `;
+
+  dialog.querySelector("button").addEventListener("click", () => {
+    dialog.remove();
+    buttonAction();
+  });
+
+  document.body.appendChild(dialog);
+}
+
 // Main
 let currentGame;
+let paused = false;
+let columnsOfRows = [];
 
-async function startGame() {
+function startGame() {
   currentGame = new Game();
-  const columnsOfRows = createTable();
+  columnsOfRows = createTable();
 
   function dropBlock(x) {
     currentGame.moveTo(x);
@@ -418,13 +448,30 @@ async function startGame() {
     });
   });
 
+  resumeGame();
+}
+
+async function resumeGame() {
+  paused = false;
+  currentGame.nextIterationScheduled = Date.now() + currentGame.iterationSpeed;
+
   do {
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
 
     currentGame.frame();
 
     paintFrame(currentGame, columnsOfRows);
-  } while (!currentGame.gameOver);
+  } while (!currentGame.gameOver && !paused);
 }
+
+function pauseGame() {
+  paused = true;
+  dialog({
+    title: "Game Paused",
+    buttonText: "Resume",
+    buttonAction: resumeGame,
+  });
+}
+//window.pauseGame = pauseGame;
 
 startGame();
