@@ -21,11 +21,13 @@ class Game {
     this.iterationSpeed = 300;
     this.nextIterationScheduled = Date.now() + this.iterationSpeed;
     this.currentBlockPosition = { x: 0, y: 0 };
+    this.currentBlockLanded = false;
     this.gameOver = false;
     this.waitUntil = {
       time: 0,
       cb: null,
     };
+    this.animate = null;
   }
   frame() {
     const currentTime = Date.now();
@@ -65,7 +67,7 @@ class Game {
   }
 
   moveTo(moveTo) {
-    if (this.currentBlock === null) {
+    if (this.currentBlock === null || this.currentBlockLanded) {
       return;
     }
 
@@ -115,13 +117,23 @@ class Game {
 
     const y = lowestBlockIndex === -1 ? BOARD_HEIGHT - 1 : lowestBlockIndex - 1;
 
-    this.board[x][y] = this.currentBlock;
-    this.currentBlock = null;
-    this.currentBlockPosition.y = 0;
+    this.currentBlockLanded = true;
+
+    this.animate = {
+      value: this.currentBlock,
+      from: { currentBlock: true },
+      to: {
+        x,
+        y,
+      },
+    };
 
     this.waitUntil = {
       time: Date.now() + animationTime,
       cb: () => {
+        this.board[x][y] = this.currentBlock;
+        this.currentBlock = null;
+
         this.explodeBlocks({ x, y });
 
         // Check if the game is over
@@ -138,6 +150,8 @@ class Game {
     this.currentBlock = this.nextBlock;
     this.nextBlock = getRandomBlock();
     this.nextIterationScheduled = Date.now() + this.iterationSpeed;
+    this.currentBlockLanded = false;
+    this.currentBlockPosition.y = 0;
   }
 
   explodeBlocks(startWith) {
@@ -325,6 +339,7 @@ function paintFrame(game, columnsAndRows) {
 
   paintCurrentBlock(game, columnsAndRows);
   paintScore(game);
+  paintAnimation(game, columnsAndRows);
 
   if (game.gameOver) {
     dialog({
@@ -334,6 +349,48 @@ function paintFrame(game, columnsAndRows) {
       buttonAction: startGame,
     });
   }
+}
+
+async function paintAnimation(game, columnsAndRows) {
+  if (!game.animate) {
+    return;
+  }
+
+  const endX = game.animate.to.x;
+  const endY = game.animate.to.y;
+
+  const endEl = columnsAndRows[endX].rows[endY];
+
+  const startEl = game.animate.from.currentBlock
+    ? document.querySelector(".block.current")
+    : columnsAndRows[game.animate.from.x].rows[game.animate.from.y];
+
+  const { left: currentBlockLeft, top: currentBlockTop } =
+    startEl.getBoundingClientRect();
+
+  const { left: endCellLeft, top: endCellTop } = endEl.getBoundingClientRect();
+
+  const startPosX = currentBlockLeft - endCellLeft;
+  const startPosY = currentBlockTop - endCellTop;
+
+  const animateEl = endEl.createElement("div");
+  animateEl.classList.add("block", "animated");
+  animateEl.setAttribute("data-value", game.animate.value);
+  animateEl.innerText = game.animate.value;
+  animateEl.style.transform = `translate(${startPosX}px, ${startPosY}px)`;
+  animateEl.style.transition = `transform ${animationTime}ms`;
+  animateEl.style.transitionTimingFunction = "ease-in";
+
+  endEl.appendChild(animateEl);
+
+  game.animate = null;
+  setTimeout(() => {
+    animateEl.remove();
+  }, animationTime);
+
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+  animateEl.style.transform = `translate(0, 0)`;
 }
 
 function paintCell(cell, value) {
