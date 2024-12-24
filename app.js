@@ -2,6 +2,8 @@
 const BOARD_HEIGHT = 10;
 const BOARD_WIDTH = 5;
 
+const animationTime = 256;
+
 const blocks = [2, 4, 8, 16, 32, 64, 128];
 
 // Game logic
@@ -20,9 +22,25 @@ class Game {
     this.nextIterationScheduled = Date.now() + this.iterationSpeed;
     this.currentBlockPosition = { x: 0, y: 0 };
     this.gameOver = false;
+    this.waitUntil = {
+      time: 0,
+      cb: null,
+    };
   }
   frame() {
     const currentTime = Date.now();
+
+    if (currentTime < this.waitUntil.time) {
+      return;
+    }
+
+    if (this.waitUntil.cb) {
+      const oldCb = this.waitUntil.cb;
+      this.waitUntil.cb = null;
+      oldCb();
+
+      return;
+    }
 
     if (currentTime < this.nextIterationScheduled) {
       return;
@@ -47,6 +65,10 @@ class Game {
   }
 
   moveTo(moveTo) {
+    if (this.currentBlock === null) {
+      return;
+    }
+
     const currentCol = this.currentBlockPosition.x;
     const currentRow = this.currentBlockPosition.y;
 
@@ -85,45 +107,54 @@ class Game {
   }
 
   dropBlock(x = this.currentBlockPosition.x) {
+    if (this.currentBlock === null) {
+      return;
+    }
+
     const lowestBlockIndex = this.board[x].findIndex((row) => row !== null);
 
     const y = lowestBlockIndex === -1 ? BOARD_HEIGHT - 1 : lowestBlockIndex - 1;
 
     this.board[x][y] = this.currentBlock;
-
-    this.explodeBlocks({ x, y });
-
-    // Check if the game is over
-    if (this.board.some((col) => col[1] !== null)) {
-      // Game over
-      this.gameOver = true;
-      return;
-    }
-
+    this.currentBlock = null;
     this.currentBlockPosition.y = 0;
+
+    this.waitUntil = {
+      time: Date.now() + animationTime,
+      cb: () => {
+        this.explodeBlocks({ x, y });
+
+        // Check if the game is over
+        if (this.board.some((col) => col[1] !== null)) {
+          // Game over
+          this.gameOver = true;
+          return;
+        }
+      },
+    };
+  }
+
+  newBlock() {
     this.currentBlock = this.nextBlock;
     this.nextBlock = getRandomBlock();
+    this.nextIterationScheduled = Date.now() + this.iterationSpeed;
   }
 
   explodeBlocks(startWith) {
     let isExploded = false;
 
     function processBlock(x, y) {
-      const block = this.board[x][y];
+      const {
+        block,
+        bottomBlock,
+        leftBlock,
+        rightBlock,
+        numberOfTouchingBlocks,
+      } = this.getSurroundingBlocks(x, y);
 
       if (block === null) {
         return;
       }
-
-      const bottomBlock = this.board[x]?.[y + 1];
-      const leftBlock = this.board[x - 1]?.[y];
-      const rightBlock = this.board[x + 1]?.[y];
-
-      const numberOfTouchingBlocks = [
-        bottomBlock,
-        leftBlock,
-        rightBlock,
-      ].filter((b) => b === block).length;
 
       if (!numberOfTouchingBlocks) {
         return;
@@ -158,6 +189,15 @@ class Game {
         processBlock.call(this, x, y);
       }
     }
+
+    if (!isExploded) {
+      this.waitUntil = {
+        time: Date.now() + animationTime,
+        cb: () => {
+          this.newBlock();
+        },
+      };
+    }
   }
 
   shiftBlocks(startWith) {
@@ -177,7 +217,58 @@ class Game {
     newBoard.forEach((col, x) => col.reverse());
 
     this.board = newBoard;
-    this.explodeBlocks(startWith);
+
+    if (this.boardHasExplodableBlocks()) {
+      this.waitUntil = {
+        time: Date.now() + animationTime,
+        cb: () => {
+          this.explodeBlocks(startWith);
+        },
+      };
+
+      return;
+    }
+
+    this.waitUntil = {
+      time: Date.now() + animationTime,
+      cb: () => {
+        this.newBlock();
+      },
+    };
+  }
+
+  boardHasExplodableBlocks() {
+    for (let x = 0; x < this.board.length; x++) {
+      for (let y = 0; y < this.board[x].length; y++) {
+        const { numberOfTouchingBlocks } = this.getSurroundingBlocks(x, y);
+
+        if (numberOfTouchingBlocks) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  getSurroundingBlocks(x, y) {
+    const block = this.board[x][y];
+
+    const bottomBlock = this.board[x]?.[y + 1];
+    const leftBlock = this.board[x - 1]?.[y];
+    const rightBlock = this.board[x + 1]?.[y];
+
+    const numberOfTouchingBlocks = [bottomBlock, leftBlock, rightBlock].filter(
+      (b) => b === block
+    ).length;
+
+    return {
+      block,
+      bottomBlock,
+      leftBlock,
+      rightBlock,
+      numberOfTouchingBlocks,
+    };
   }
 }
 
@@ -281,8 +372,8 @@ function paintCurrentBlock(game, columnsAndRows) {
 
   const blockQuery = cell.querySelector(".block.current");
 
-  if (game.gameOver) {
-    blockQuery?.remove();
+  if (game.gameOver || value === null) {
+    document.querySelector(".block.current")?.remove();
     return;
   }
 
@@ -329,7 +420,9 @@ async function startGame() {
 
   do {
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
     currentGame.frame();
+
     paintFrame(currentGame, columnsOfRows);
   } while (!currentGame.gameOver);
 }
